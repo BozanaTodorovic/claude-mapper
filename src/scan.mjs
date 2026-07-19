@@ -19,12 +19,12 @@ export function dirs(root, relPath) {
 }
 
 /** List source files (by extension) in a path, sorted, extension-stripped. */
-export function files(root, relPath, ext = [".ts", ".tsx", ".js", ".jsx"]) {
+export function files(root, relPath, ext = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]) {
   const abs = join(root, relPath);
   if (!existsSync(abs)) return [];
   return readdirSync(abs)
     .filter((n) => ext.some((e) => n.endsWith(e)) && !n.endsWith(".d.ts") && !n.endsWith(".test.ts"))
-    .map((n) => n.replace(/\.(tsx|ts|jsx|js)$/, ""))
+    .map((n) => n.replace(/\.(tsx|ts|jsx|js|mjs|cjs)$/, ""))
     .sort();
 }
 
@@ -51,7 +51,7 @@ const CONVENTIONS = [
   { path: "src/controllers", label: "Controllers", kind: "files" },
   { path: "controllers", label: "Controllers", kind: "files" },
 
-  // Service/domain layer (Clean Architecture-ish)
+  // Service/domain layer (Clean Architecture-ish, lowercase convention)
   { path: "src/services", label: "Services", kind: "files" },
   { path: "src/domain", label: "Domain", kind: "dirs" },
   { path: "src/application", label: "Application services", kind: "dirs" },
@@ -60,6 +60,16 @@ const CONVENTIONS = [
   { path: "src/repositories", label: "Repositories", kind: "files" },
   { path: "src/models", label: "Models", kind: "files" },
   { path: "src/schema", label: "Schema", kind: "files" },
+
+  // Clean Architecture, PascalCase layer convention (Presentation/Domain/
+  // Application/Infrastructure — common in .NET-influenced TS backends).
+  // Checked deeper-first since these repos often also have a shallow
+  // src/domain that would otherwise steal the "Domain" label.
+  { path: "src/Presentation/contracts", label: "Domains (contract-first routes)", kind: "dirs" },
+  { path: "src/Presentation/routes", label: "Domains (legacy routes)", kind: "dirs" },
+  { path: "src/Application/services", label: "Domains (services)", kind: "dirs" },
+  { path: "src/Infrastructure/repositories", label: "Domains (repositories)", kind: "dirs" },
+  { path: "src/Domain/models", label: "Domain models", kind: "files" },
 
   // Components
   { path: "src/components", label: "Components", kind: "dirs" },
@@ -79,6 +89,22 @@ const CONVENTIONS = [
 ];
 
 const list = (arr) => (arr.length ? "`" + arr.join("`, `") + "`" : "_(none)_");
+
+/**
+ * "Config-only" package fallback: a package with no `src/` at all, but real
+ * `scripts/` (build/codegen tooling) and/or `config/` (JSON/YAML configs) —
+ * common for codegen packages, CLI wrapper packages, or infra-only packages
+ * that have no application source of their own.
+ */
+function scanConfigOnlyPackage(root) {
+  if (existsSync(join(root, "src"))) return []; // only a fallback for src-less packages
+  const lines = [];
+  const scripts = files(root, "scripts", [".ts", ".mjs", ".js"]);
+  if (scripts.length) lines.push(`- **Scripts** (${scripts.length}): ${list(scripts)}`);
+  const configs = files(root, "config", [".json", ".yaml", ".yml"]);
+  if (configs.length) lines.push(`- **Configs** (${configs.length}): ${list(configs)}`);
+  return lines;
+}
 
 /**
  * Sibling-package monorepo fallback: top-level folders that each have their
@@ -123,8 +149,11 @@ export function scanRepo(root, overrides = null) {
     }
   }
 
-  // Only try the sibling-package fallback if nothing else matched — a repo
-  // with a real src/ at its root should never also get per-folder noise.
+  // Fallbacks only kick in if nothing else matched — a repo with a real
+  // src/ at its root should never also get per-folder or config-only noise.
+  if (!lines.length && !overrides?.replaceConventions) {
+    lines.push(...scanConfigOnlyPackage(root));
+  }
   if (!lines.length && !overrides?.replaceConventions) {
     lines.push(...scanSiblingPackages(root));
   }

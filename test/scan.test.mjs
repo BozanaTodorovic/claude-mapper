@@ -32,6 +32,15 @@ test("scanRepo falls back to sibling-package scan (services monorepo)", () => {
   assert.match(joined, /`usersRoute`/);
 });
 
+test("scanRepo falls back to config-only scan (scripts/+config/, no src/)", () => {
+  const lines = scanRepo(join(__dirname, "fixtures", "config-only"));
+  const joined = lines.join("\n");
+  assert.match(joined, /\*\*Scripts\*\*/);
+  assert.match(joined, /`build`/);
+  assert.match(joined, /\*\*Configs\*\*/);
+  assert.match(joined, /`settings\.json`/);
+});
+
 test("scanRepo honors .claude-mapper.json overrides", () => {
   const overrides = {
     paths: [{ path: "src/routes", label: "Custom Routes", kind: "files" }],
