@@ -20,9 +20,16 @@ test("scanRepo detects features and routes in a sample repo", () => {
 });
 
 test("scanRepo reports no-layout message for an empty dir", () => {
-  const lines = scanRepo(join(__dirname, "fixtures"));
+  const lines = scanRepo(join(__dirname, "fixtures", "empty-repo"));
   assert.equal(lines.length, 1);
   assert.match(lines[0], /No recognized source layout/);
+});
+
+test("scanRepo falls back to sibling-package scan (services monorepo)", () => {
+  const lines = scanRepo(join(__dirname, "fixtures"));
+  const joined = lines.join("\n");
+  assert.match(joined, /\*\*sample-repo\/ routes\*\*/);
+  assert.match(joined, /`usersRoute`/);
 });
 
 test("scanRepo honors .claude-mapper.json overrides", () => {

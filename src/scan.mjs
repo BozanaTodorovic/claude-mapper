@@ -81,6 +81,27 @@ const CONVENTIONS = [
 const list = (arr) => (arr.length ? "`" + arr.join("`, `") + "`" : "_(none)_");
 
 /**
+ * Sibling-package monorepo fallback: top-level folders that each have their
+ * own `src/` (e.g. `pdf/src`, `excel/src`, `mail/src` — a services monorepo
+ * with no `packages/`/`apps/` wrapper folder). For each such sibling, list
+ * its own `src/routes` (or `src/services` as a second choice) files under a
+ * `<name>/ routes` label, matching how a human would describe "this repo has
+ * N little services, here's what each one exposes."
+ */
+function scanSiblingPackages(root) {
+  const siblings = dirs(root, ".").filter((name) => existsSync(join(root, name, "src")));
+  const lines = [];
+  for (const name of siblings) {
+    const routeFiles = files(root, `${name}/src/routes`);
+    const serviceFiles = routeFiles.length ? [] : files(root, `${name}/src/services`);
+    const items = routeFiles.length ? routeFiles : serviceFiles;
+    const label = routeFiles.length ? `${name}/ routes` : `${name}/ services`;
+    if (items.length) lines.push(`- **${label}** (${items.length}): ${list(items)}`);
+  }
+  return lines;
+}
+
+/**
  * Scan a repo root and produce an array of markdown bullet lines describing
  * its structure. `overrides` (from .claude-mapper.json) can add extra
  * { path, label, kind } entries or replace the whole convention list.
@@ -100,6 +121,12 @@ export function scanRepo(root, overrides = null) {
       lines.push(`- **${label}** (${items.length}): ${list(items)}`);
       seenLabels.add(label);
     }
+  }
+
+  // Only try the sibling-package fallback if nothing else matched — a repo
+  // with a real src/ at its root should never also get per-folder noise.
+  if (!lines.length && !overrides?.replaceConventions) {
+    lines.push(...scanSiblingPackages(root));
   }
 
   if (!lines.length) {
