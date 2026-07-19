@@ -1,0 +1,112 @@
+/**
+ * Generic, convention-based repo scanner.
+ *
+ * No project-specific knowledge — recognizes widely-used folder conventions
+ * across JS/TS ecosystems (Next.js/Express/Nest/generic feature-folder apps)
+ * and reports what it finds as labeled groups. A repo can override or extend
+ * this via .claude-mapper.json (see config.mjs).
+ */
+import { readdirSync, existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+/** List immediate subdirectories of a path (sorted, hidden dirs excluded). */
+export function dirs(root, relPath) {
+  const abs = join(root, relPath);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs)
+    .filter((n) => !n.startsWith(".") && !n.startsWith("_") && statSync(join(abs, n)).isDirectory())
+    .sort();
+}
+
+/** List source files (by extension) in a path, sorted, extension-stripped. */
+export function files(root, relPath, ext = [".ts", ".tsx", ".js", ".jsx"]) {
+  const abs = join(root, relPath);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs)
+    .filter((n) => ext.some((e) => n.endsWith(e)) && !n.endsWith(".d.ts") && !n.endsWith(".test.ts"))
+    .map((n) => n.replace(/\.(tsx|ts|jsx|js)$/, ""))
+    .sort();
+}
+
+/**
+ * Known folder conventions, checked in order. Each entry: a relative path to
+ * look for, a human label, and whether to list files (vs. subdirectories).
+ * First-match-per-category — a repo can match several categories at once
+ * (e.g. a Next.js app has both `src/app` and `src/features`).
+ */
+const CONVENTIONS = [
+  // Feature-folder pattern (React/Vue/Svelte apps organized by domain)
+  { path: "src/features", label: "Features", kind: "dirs" },
+  { path: "features", label: "Features", kind: "dirs" },
+
+  // Next.js App Router / Pages Router
+  { path: "src/app", label: "App routes", kind: "dirs" },
+  { path: "app", label: "App routes", kind: "dirs" },
+  { path: "src/pages", label: "Pages", kind: "dirs" },
+  { path: "pages", label: "Pages", kind: "dirs" },
+
+  // Backend route/controller conventions
+  { path: "src/routes", label: "Routes", kind: "files" },
+  { path: "routes", label: "Routes", kind: "files" },
+  { path: "src/controllers", label: "Controllers", kind: "files" },
+  { path: "controllers", label: "Controllers", kind: "files" },
+
+  // Service/domain layer (Clean Architecture-ish)
+  { path: "src/services", label: "Services", kind: "files" },
+  { path: "src/domain", label: "Domain", kind: "dirs" },
+  { path: "src/application", label: "Application services", kind: "dirs" },
+
+  // Data layer
+  { path: "src/repositories", label: "Repositories", kind: "files" },
+  { path: "src/models", label: "Models", kind: "files" },
+  { path: "src/schema", label: "Schema", kind: "files" },
+
+  // Components
+  { path: "src/components", label: "Components", kind: "dirs" },
+  { path: "components", label: "Components", kind: "dirs" },
+
+  // Shared/lib
+  { path: "src/lib", label: "Lib", kind: "files" },
+  { path: "src/utils", label: "Utils", kind: "files" },
+  { path: "src/shared", label: "Shared", kind: "dirs" },
+
+  // API/SDK packages
+  { path: "src/resources", label: "SDK resources", kind: "dirs" },
+
+  // Packages in a JS/TS monorepo
+  { path: "packages", label: "Packages", kind: "dirs" },
+  { path: "apps", label: "Apps", kind: "dirs" },
+];
+
+const list = (arr) => (arr.length ? "`" + arr.join("`, `") + "`" : "_(none)_");
+
+/**
+ * Scan a repo root and produce an array of markdown bullet lines describing
+ * its structure. `overrides` (from .claude-mapper.json) can add extra
+ * { path, label, kind } entries or replace the whole convention list.
+ */
+export function scanRepo(root, overrides = null) {
+  const conventions = overrides?.replaceConventions
+    ? overrides.paths
+    : [...(overrides?.paths ?? []), ...CONVENTIONS];
+
+  const lines = [];
+  const seenLabels = new Set();
+
+  for (const { path, label, kind } of conventions) {
+    if (seenLabels.has(label)) continue; // first match per label wins
+    const items = kind === "files" ? files(root, path) : dirs(root, path);
+    if (items.length) {
+      lines.push(`- **${label}** (${items.length}): ${list(items)}`);
+      seenLabels.add(label);
+    }
+  }
+
+  if (!lines.length) {
+    lines.push(
+      "_No recognized source layout. Add a `.claude-mapper.json` with custom `paths` — see README._",
+    );
+  }
+
+  return lines;
+}
