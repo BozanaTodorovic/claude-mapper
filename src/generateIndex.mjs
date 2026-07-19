@@ -20,7 +20,7 @@ function looksLikeProject(dirPath) {
 
 /**
  * @param {string} workspaceRoot
- * @param {{ match?: RegExp }} [opts] optional filter on directory name
+ * @param {{ match?: RegExp, dryRun?: boolean }} [opts] optional filter on directory name
  */
 export function generateIndex(workspaceRoot, opts = {}) {
   const entries = readdirSync(workspaceRoot)
@@ -33,8 +33,8 @@ export function generateIndex(workspaceRoot, opts = {}) {
   for (const name of entries) {
     const repoPath = join(workspaceRoot, name);
     try {
-      const { action } = generateMap(repoPath);
-      rows.push(`| \`${name}\` | [\`${name}/MAP.md\`](${name}/MAP.md) | ${action} |`);
+      const { action } = generateMap(repoPath, { dryRun: opts.dryRun });
+      rows.push(`| \`${name}\` | [\`${name}/MAP.md\`](${name}/MAP.md) | ${action}${opts.dryRun ? " (dry-run)" : ""} |`);
     } catch (err) {
       rows.push(`| \`${name}\` | — | generation failed: ${err.message} |`);
     }
@@ -79,6 +79,8 @@ If you move/rename/add a folder, feature, domain, or route, rerun the generator 
 `;
   }
 
-  writeFileSync(archPath, output);
+  if (!opts.dryRun) {
+    writeFileSync(archPath, output);
+  }
   return { repoCount: entries.length };
 }

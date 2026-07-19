@@ -41,6 +41,27 @@ test("scanRepo falls back to config-only scan (scripts/+config/, no src/)", () =
   assert.match(joined, /`settings\.json`/);
 });
 
+test("scanRepo detects Go standard project layout (cmd/internal/pkg)", () => {
+  const lines = scanRepo(join(__dirname, "fixtures", "go-repo"));
+  const joined = lines.join("\n");
+  assert.match(joined, /\*\*Commands\*\* \(1\)/);
+  assert.match(joined, /`server`/);
+  assert.match(joined, /\*\*Internal packages\*\* \(1\)/);
+  assert.match(joined, /`auth`/);
+  assert.match(joined, /\*\*Public packages\*\* \(1\)/);
+  assert.match(joined, /`utils`/);
+});
+
+test("scanRepo detects Python app/routers + app/models", () => {
+  const lines = scanRepo(join(__dirname, "fixtures", "py-repo"));
+  const joined = lines.join("\n");
+  assert.match(joined, /\*\*Routers\*\* \(2\)/);
+  assert.match(joined, /`users`/);
+  assert.match(joined, /`posts`/);
+  assert.match(joined, /\*\*Models\*\* \(1\)/);
+  assert.match(joined, /`user`/);
+});
+
 test("scanRepo honors .claude-mapper.json overrides", () => {
   const overrides = {
     paths: [{ path: "src/routes", label: "Custom Routes", kind: "files" }],

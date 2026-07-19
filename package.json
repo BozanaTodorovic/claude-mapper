@@ -1,6 +1,6 @@
 {
   "name": "claude-mapper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generates navigable MAP.md files and a multi-repo ARCHITECTURE.md index so AI coding agents (Claude Code and similar) stop blind-scanning your folders. Zero dependencies.",
   "type": "module",
   "bin": {
@@ -9,6 +9,7 @@
   "files": [
     "bin",
     "src",
+    "examples",
     "README.md",
     "LICENSE"
   ],
@@ -25,11 +26,17 @@
     "codebase-map",
     "monorepo",
     "documentation",
-    "cli"
+    "cli",
+    "architecture",
+    "onboarding"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/REPLACE_ME/claude-mapper.git"
-  }
+    "url": "git+https://github.com/owlCoder/claude-mapper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/owlCoder/claude-mapper/issues"
+  },
+  "homepage": "https://github.com/owlCoder/claude-mapper#readme"
 }

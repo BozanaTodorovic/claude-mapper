@@ -14,7 +14,12 @@ import { loadConfig } from "./config.mjs";
 const START = "<!-- AUTO:START -->";
 const END = "<!-- AUTO:END -->";
 
-export function generateMap(root) {
+/**
+ * @param {string} root
+ * @param {{ dryRun?: boolean }} [opts] dryRun: compute the result but don't write MAP.md
+ * @returns {{ repo: string, action: "created"|"updated", content: string, path: string }}
+ */
+export function generateMap(root, opts = {}) {
   const repo = basename(root);
   const config = loadConfig(root);
   const structureLines = scanRepo(root, config);
@@ -57,6 +62,8 @@ ${END}
     action = "created";
   }
 
-  writeFileSync(mapPath, content);
-  return { repo, action };
+  if (!opts.dryRun) {
+    writeFileSync(mapPath, content);
+  }
+  return { repo, action, content, path: mapPath };
 }

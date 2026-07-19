@@ -18,13 +18,18 @@ export function dirs(root, relPath) {
     .sort();
 }
 
-/** List source files (by extension) in a path, sorted, extension-stripped. */
-export function files(root, relPath, ext = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]) {
+/**
+ * List source files (by extension) in a path, sorted. Filenames have their
+ * matched extension stripped (e.g. `usersRoute.ts` -> `usersRoute`) UNLESS
+ * `stripExt` is false — config files (`.json`/`.yaml`) keep their extension
+ * since the extension is part of what identifies them.
+ */
+export function files(root, relPath, ext = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"], stripExt = true) {
   const abs = join(root, relPath);
   if (!existsSync(abs)) return [];
   return readdirSync(abs)
     .filter((n) => ext.some((e) => n.endsWith(e)) && !n.endsWith(".d.ts") && !n.endsWith(".test.ts"))
-    .map((n) => n.replace(/\.(tsx|ts|jsx|js|mjs|cjs)$/, ""))
+    .map((n) => (stripExt ? n.slice(0, -ext.find((e) => n.endsWith(e)).length) : n))
     .sort();
 }
 
@@ -86,6 +91,17 @@ const CONVENTIONS = [
   // Packages in a JS/TS monorepo
   { path: "packages", label: "Packages", kind: "dirs" },
   { path: "apps", label: "Apps", kind: "dirs" },
+
+  // Python: Django/Flask/FastAPI-style app layout
+  { path: "app/routers", label: "Routers", kind: "files", ext: [".py"] },
+  { path: "app/api", label: "API routes", kind: "dirs" },
+  { path: "app/models", label: "Models", kind: "files", ext: [".py"] },
+  { path: "app/services", label: "Services", kind: "files", ext: [".py"] },
+
+  // Go: standard project layout (golang-standards/project-layout)
+  { path: "cmd", label: "Commands", kind: "dirs" },
+  { path: "internal", label: "Internal packages", kind: "dirs" },
+  { path: "pkg", label: "Public packages", kind: "dirs" },
 ];
 
 const list = (arr) => (arr.length ? "`" + arr.join("`, `") + "`" : "_(none)_");
@@ -101,7 +117,7 @@ function scanConfigOnlyPackage(root) {
   const lines = [];
   const scripts = files(root, "scripts", [".ts", ".mjs", ".js"]);
   if (scripts.length) lines.push(`- **Scripts** (${scripts.length}): ${list(scripts)}`);
-  const configs = files(root, "config", [".json", ".yaml", ".yml"]);
+  const configs = files(root, "config", [".json", ".yaml", ".yml"], false);
   if (configs.length) lines.push(`- **Configs** (${configs.length}): ${list(configs)}`);
   return lines;
 }
@@ -140,9 +156,9 @@ export function scanRepo(root, overrides = null) {
   const lines = [];
   const seenLabels = new Set();
 
-  for (const { path, label, kind } of conventions) {
+  for (const { path, label, kind, ext } of conventions) {
     if (seenLabels.has(label)) continue; // first match per label wins
-    const items = kind === "files" ? files(root, path) : dirs(root, path);
+    const items = kind === "files" ? files(root, path, ext) : dirs(root, path);
     if (items.length) {
       lines.push(`- **${label}** (${items.length}): ${list(items)}`);
       seenLabels.add(label);

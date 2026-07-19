@@ -30,6 +30,17 @@ test("generateMap creates MAP.md when none exists", () => {
   });
 });
 
+test("generateMap dryRun computes content but writes nothing", () => {
+  withTempCopy((tmp) => {
+    const mapPath = join(tmp, "MAP.md");
+    const { action, content } = generateMap(tmp, { dryRun: true });
+
+    assert.equal(action, "created");
+    assert.match(content, /<!-- AUTO:START -->/);
+    assert.throws(() => readFileSync(mapPath, "utf8"));
+  });
+});
+
 test("generateMap preserves hand-written content outside AUTO markers", () => {
   withTempCopy((tmp) => {
     generateMap(tmp); // first pass creates the file

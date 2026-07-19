@@ -2,6 +2,7 @@
 import { generateMap } from "../src/generateMap.mjs";
 import { generateIndex } from "../src/generateIndex.mjs";
 import { checkStaleness } from "../src/checkStale.mjs";
+import { initConfig } from "../src/init.mjs";
 
 const HELP = `claude-mapper — generate navigable MAP.md files for AI coding agents
 
@@ -9,12 +10,15 @@ Usage:
   claude-mapper generate            Generate/update MAP.md for the current repo
   claude-mapper generate --all      Generate MAP.md for every sub-repo in this
                                      workspace + a root ARCHITECTURE.md index
+  claude-mapper generate --dry-run  Preview output without writing any file
   claude-mapper check                Check current repo's MAP.md for staleness
   claude-mapper check --all          Check every sub-repo's MAP.md for staleness
+  claude-mapper init                 Scaffold a starter .claude-mapper.json
 
 Options:
   --all              Treat cwd as a multi-repo workspace root, not a single repo
   --match <regex>    Only include child dirs matching this regex (with --all)
+  --dry-run          Compute output but don't write MAP.md/ARCHITECTURE.md
   -h, --help         Show this help
 `;
 
@@ -23,6 +27,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--all") args.all = true;
+    else if (a === "--dry-run") args.dryRun = true;
     else if (a === "--match") args.match = argv[++i];
     else if (a === "-h" || a === "--help") args.help = true;
     else args._.push(a);
@@ -49,11 +54,17 @@ function main() {
 
   if (command === "generate") {
     if (args.all) {
-      const { repoCount } = generateIndex(cwd, { match });
-      console.log(`[claude-mapper] processed ${repoCount} repo(s); ARCHITECTURE.md updated.`);
+      const { repoCount } = generateIndex(cwd, { match, dryRun: args.dryRun });
+      const suffix = args.dryRun ? " (dry-run, nothing written)" : "; ARCHITECTURE.md updated";
+      console.log(`[claude-mapper] processed ${repoCount} repo(s)${suffix}.`);
     } else {
-      const { repo, action } = generateMap(cwd);
-      console.log(`[claude-mapper] ${repo}: MAP.md ${action}.`);
+      const { repo, action, content } = generateMap(cwd, { dryRun: args.dryRun });
+      if (args.dryRun) {
+        console.log(`[claude-mapper] ${repo}: MAP.md would be ${action} (dry-run, nothing written):\n`);
+        console.log(content);
+      } else {
+        console.log(`[claude-mapper] ${repo}: MAP.md ${action}.`);
+      }
     }
     return;
   }
@@ -69,6 +80,16 @@ function main() {
       console.log(`\n[claude-mapper] ${staleCount} map(s) stale.`);
       process.exitCode = 1;
     }
+    return;
+  }
+
+  if (command === "init") {
+    const { created, path } = initConfig(cwd);
+    console.log(
+      created
+        ? `[claude-mapper] created ${path}`
+        : `[claude-mapper] ${path} already exists — not overwriting.`,
+    );
     return;
   }
 
