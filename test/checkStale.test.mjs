@@ -124,3 +124,50 @@ test("check shows differences in other AUTO lines", () => withTempDir((root) => 
     "Expected the changed AUTO line to appear in the differences"
   );
 }));
+
+test("check displays a removed duplicate AUTO line", () => withTempDir((root) => {
+  feature(root, "auth");
+  generateMap(root);
+
+  const mapPath = join(root, "MAP.md");
+  const original = readFileSync(mapPath, "utf8");
+  const featureLine = original.split(/\r?\n/).find((line) => line.includes("- **Features**"));
+
+  assert.ok(featureLine);
+
+  writeFileSync(mapPath, original.replace(featureLine, `${featureLine}\n${featureLine}`));
+
+  const result = checkStaleness(root);
+
+  assert.equal(result.staleCount, 1);
+  assert.ok(
+    result.results[0].changes.some((line) => line.startsWith("- ") && line.includes("Features"))
+  );
+}));
+
+test("check displays differences when AUTO lines are reordered", () => withTempDir((root) => {
+  feature(root, "auth");
+  mkdirSync(join(root, "src", "routes"), { recursive: true });
+  writeFileSync(join(root, "src", "routes", "usersRoute.ts"), "");
+
+  generateMap(root);
+
+  const mapPath = join(root, "MAP.md");
+  const lines = readFileSync(mapPath, "utf8").split(/\r?\n/);
+
+  const featureIndex = lines.findIndex((line) => line.startsWith("- **Features**"));
+  const routeIndex = lines.findIndex((line) => line.startsWith("- **Routes**"));
+
+  assert.ok(featureIndex >= 0);
+  assert.ok(routeIndex >= 0);
+
+  [lines[featureIndex], lines[routeIndex]] = [lines[routeIndex], lines[featureIndex]];
+  writeFileSync(mapPath, lines.join("\n"));
+
+  const result = checkStaleness(root);
+
+  assert.equal(result.staleCount, 1);
+  assert.equal(result.results[0].reason, "content-changed");
+  assert.ok(result.results[0].changes.some((line) => line.startsWith("- ")));
+  assert.ok(result.results[0].changes.some((line) => line.startsWith("+ ")));
+}));

@@ -18,16 +18,56 @@ function extractAuto(content) {
   return content.slice(start + START.length, end).replace(/\r\n/g, "\n").trim();
 }
 
+
 function changedRows(previous, current) {
   const mapRows = (value) => value.split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+
   const oldLines = mapRows(previous);
   const newLines = mapRows(current);
-  return [
-    ...oldLines.filter((line) => !newLines.includes(line)).map((line) => `- ${line.replace(/^- /, "")}`),
-    ...newLines.filter((line) => !oldLines.includes(line)).map((line) => `+ ${line.replace(/^- /, "")}`),
-  ];
+
+  const dp = Array.from(
+    { length: oldLines.length + 1 },
+    () => Array(newLines.length + 1).fill(0)
+  );
+
+  for (let i = oldLines.length - 1; i >= 0; i--) {
+    for (let j = newLines.length - 1; j >= 0; j--) {
+      dp[i][j] = oldLines[i] === newLines[j]
+        ? dp[i + 1][j + 1] + 1
+        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const changes = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < oldLines.length && j < newLines.length) {
+    if (oldLines[i] === newLines[j]) {
+      i++;
+      j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      changes.push(`- ${oldLines[i].replace(/^- /, "")}`);
+      i++;
+    } else {
+      changes.push(`+ ${newLines[j].replace(/^- /, "")}`);
+      j++;
+    }
+  }
+
+  while (i < oldLines.length) {
+    changes.push(`- ${oldLines[i].replace(/^- /, "")}`);
+    i++;
+  }
+
+  while (j < newLines.length) {
+    changes.push(`+ ${newLines[j].replace(/^- /, "")}`);
+    j++;
+  }
+
+  return changes;
 }
 
 function checkOne(repoPath, repoLabel) {
